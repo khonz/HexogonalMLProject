@@ -1,8 +1,10 @@
 #%%
 import collections
 import math
+from PIL import Image, ImageDraw, ImageFont
 
 #%%
+#Defining functions of hexogonal grid
 Point = collections.namedtuple("Point", ["x", "y"])
 
 
@@ -25,6 +27,17 @@ def hex_subtract(a, b):
 def hex_scale(a, k:int):
     return Hex(a.q * k, a.r * k, a.s * k)
 
+def hex_rotate_left(a):
+    return Hex(-a.s, -a.q, -a.r)
+
+def hex_rotate_right(a):
+    return Hex(-a.r, -a.s, -a.q)
+
+def hex_flip_q(a):
+    return Hex(-a.q,a.r,a.q-a.r)
+
+def hex_flip_r(a):
+    return Hex(a.q,-a.r,-a.q+a.r)
 
 def hex_length(hex): #length of the line from 0,0 to the hexagon
     return (abs(hex.q) + abs(hex.r) + abs(hex.s)) // 2
@@ -50,7 +63,7 @@ layout_pointy = Orientation(math.sqrt(3.0), math.sqrt(3.0) / 2.0, 0.0, 3.0 / 2.0
 layout_flat = Orientation(3.0 / 2.0, 0.0, math.sqrt(3.0) / 2.0, math.sqrt(3.0), 2.0 / 3.0, 0.0, -1.0 / 3.0, math.sqrt(3.0) / 3.0, 0.0)
 
 
-
+#Functions for locating points in xy coordinates
 def hex_to_pixel(layout, h): #returns the x,y coordinate of the center of the hexagon
     M = layout.orientation
     x = (M.f0*h.q+M.f1*h.r)*layout.size.x
@@ -72,71 +85,94 @@ def polygon_corners(layout, h): #Creates an array of corners by applying the cor
         corners.append(Point(center.x + offset.x, center.y + offset.y))
     return corners
 
-
-#%%
-#Test functions
-def complain(name):
-    print("FAIL {0}".format(name))
-
-def equal_hex(name, a, b):
-    if not (a.q == b.q and a.s == b.s and a.r == b.r):
-        complain(name)
-
-def equal_int(name, a, b):
-    if not (a == b):
-        complain(name)
-
-def equal_hex_array(name, a, b):
-    equal_int(name, len(a), len(b))
-    for i in range(0, len(a)):
-        equal_hex(name, a[i], b[i])
-
-def test_hex_arithmetic():
-    equal_hex("hex_add", Hex(4, -10, 6), hex_add(Hex(1, -3, 2), Hex(3, -7, 4)))
-    equal_hex("hex_subtract", Hex(-2, 4, -2), hex_subtract(Hex(1, -3, 2), Hex(3, -7, 4)))
-
-def test_hex_direction():
-    equal_hex("hex_direction", Hex(0, -1, 1), hex_direction(2))
-
-def test_hex_neighbor():
-    equal_hex("hex_neighbor", Hex(1, -3, 2), hex_neighbor(Hex(1, -2, 1), 2))
-
-
-def test_hex_distance():
-    equal_int("hex_distance", 7, hex_distance(Hex(3, -7, 4), Hex(0, 0, 0)))
+def to_tuple(corners): # 
+    tuple_corners=[]
+    for p in corners:
+        tuple_corners.append((p.x,p.y))
+    return tuple_corners
 
 
 
-
-
-def test_all():
-    test_hex_arithmetic()
-    test_hex_direction()
-    test_hex_neighbor()
-    test_hex_distance()
-
-
-
-
-test_all()
-
-
-#%%
-# Creates rectangular map of hexagons
+# Creates rectangular map of hexagons, origin is in top left
 def rect_map(map_height,map_width):
     map=[]
     for r in range(map_height):
         r_offset=math.floor(r/2)
         for q in range(-r_offset,map_width-r_offset):
+            #map.append(Hex(q,r-map_height//2,-(q)-(r-map_height//2)))
             map.append(Hex(q,r,-q-r))
     return map
 
 
 #%%
-map=rect_map(6,8)
-map
-#%%
-layout= Layout(layout_pointy,Point(10,10),Point(0,0))
+#Functions for drawing hexagons
+def plot_hex_grid(h,draw):
+    corners=to_tuple(polygon_corners(layout,h))
+    draw.polygon(corners,outline='white')
+
+def plot_hex_grid_text(h,draw):   #writes the q,r coordinates in the middle of each hexagon
+    corners=to_tuple(polygon_corners(layout,h))
+    draw.polygon(corners,outline='white')
+    shift=d.textsize(f"({h.q},{h.r})")
+    draw.text((hex_to_pixel(layout,h).x-shift[0]//2,hex_to_pixel(layout,h).y-shift[1]//2),f"({h.q},{h.r})",fill='white')
+
+def plot_hex_dots(h,draw):
+    corners=to_tuple(polygon_corners(layout,h))
+    dot_size=70
+    for p in corners:
+        p1=(p[0]-dot_size,p[1]-dot_size)
+        p2=(p[0]+dot_size,p[1]+dot_size)
+        draw.ellipse([p1,p2],fill='white')
+
+
 
 
 #%%
+#Drawing Hexogonal grid
+image_size=(10240,10240)
+im=Image.new('1',image_size,color=0)
+d=ImageDraw.Draw(im)
+#origin=Point(image_size[0]//2,image_size[1]//2) #middle of the imgage
+origin=Point(0,0) #Top left corner
+size=Point(1500,1500)
+layout= Layout(layout_pointy,size,origin)
+map=rect_map(6,6)
+
+for h in map:
+    plot_hex_dots(h,d)
+    
+im.show()
+im.save("hex_lat_dots.png")
+
+
+
+#%%
+#Test functions
+def complain(name):
+    print("FAIL {0}".format(name))
+def equal_hex(name, a, b):
+    if not (a.q == b.q and a.s == b.s and a.r == b.r):
+        complain(name)
+def equal_int(name, a, b):
+    if not (a == b):
+        complain(name)
+def equal_hex_array(name, a, b):
+    equal_int(name, len(a), len(b))
+    for i in range(0, len(a)):
+        equal_hex(name, a[i], b[i])
+def test_hex_arithmetic():
+    equal_hex("hex_add", Hex(4, -10, 6), hex_add(Hex(1, -3, 2), Hex(3, -7, 4)))
+    equal_hex("hex_subtract", Hex(-2, 4, -2), hex_subtract(Hex(1, -3, 2), Hex(3, -7, 4)))
+def test_hex_direction():
+    equal_hex("hex_direction", Hex(0, -1, 1), hex_direction(2))
+def test_hex_neighbor():
+    equal_hex("hex_neighbor", Hex(1, -3, 2), hex_neighbor(Hex(1, -2, 1), 2))
+def test_hex_distance():
+    equal_int("hex_distance", 7, hex_distance(Hex(3, -7, 4), Hex(0, 0, 0)))
+def test_all():
+    test_hex_arithmetic()
+    test_hex_direction()
+    test_hex_neighbor()
+    test_hex_distance()
+test_all()
+
