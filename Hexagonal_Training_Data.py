@@ -3,6 +3,8 @@ import collections
 import math
 from PIL import Image, ImageDraw, ImageFont
 
+#This is just a test comment.
+
 #%%
 #Defining functions of hexogonal grid
 Point = collections.namedtuple("Point", ["x", "y"])
